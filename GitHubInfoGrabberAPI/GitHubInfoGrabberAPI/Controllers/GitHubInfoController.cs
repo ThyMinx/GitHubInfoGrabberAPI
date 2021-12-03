@@ -36,7 +36,8 @@ namespace GitHubInfoGrabberAPI.Controllers
 
             return info;
         }
-
+        #region web scraping area
+        [ApiExplorerSettings(IgnoreApi = true)]
         public List<Project> GetListOfPopularProjects(string url)
         {
             HtmlWeb web = new HtmlWeb();
@@ -78,7 +79,7 @@ namespace GitHubInfoGrabberAPI.Controllers
 
             return projects;
         }
-
+        [ApiExplorerSettings(IgnoreApi = true)]
         public List<Project> GetListOfPinnedProjects(string url)
         {
             HtmlWeb web = new HtmlWeb();
@@ -120,7 +121,7 @@ namespace GitHubInfoGrabberAPI.Controllers
 
             return projects;
         }
-
+        [ApiExplorerSettings(IgnoreApi = true)]
         public HtmlNode NodeChecker(HtmlNode parent, string xpath)
         {
             var nodechecker = parent.SelectNodes(xpath);
@@ -128,5 +129,6 @@ namespace GitHubInfoGrabberAPI.Controllers
 
             return matchedNode;
         }
+        #endregion
     }
 }

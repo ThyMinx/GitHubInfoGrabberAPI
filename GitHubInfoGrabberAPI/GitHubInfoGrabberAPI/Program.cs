@@ -13,7 +13,12 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    //app.UseDeveloperExceptionPage();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("swagger/v1/swagger.json", "GitHub Info Grabber API V1");
+        c.RoutePrefix = string.Empty;
+    });
 }
 
 app.UseHttpsRedirection();
