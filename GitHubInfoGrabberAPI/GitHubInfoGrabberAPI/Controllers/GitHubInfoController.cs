@@ -10,8 +10,10 @@ namespace GitHubInfoGrabberAPI.Controllers
     public class GitHubInfoController : ControllerBase
     {
         [HttpGet(Name = "GetPinnedProjects")]
-        public GitHubInfo GetPinnedProject(string url)
+        public GitHubInfo GetPinnedProject(string username)
         {
+            string url = "https://www.github.com/" + username;
+
             GitHubInfo info = new GitHubInfo();
 
             string type = "";
