@@ -1,136 +1,46 @@
 ﻿using GitHubInfoGrabberAPI.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using HtmlAgilityPack;
+using Microsoft.AspNetCore.Cors;
+using GitHubInfoGrabberAPI.Services;
 
-namespace GitHubInfoGrabberAPI.Controllers
+namespace GitHubInfoGrabberAPI.Controllers;
+[Route("api/[controller]")]
+[ApiController]
+public class GitHubInfoController : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class GitHubInfoController : ControllerBase
+    private readonly IGitHubInfoService _ghiService;
+
+    public GitHubInfoController(IGitHubInfoService ghiService)
     {
-        [HttpGet(Name = "GetPinnedProjects")]
-        public GitHubInfo GetPinnedProject(string username)
+        _ghiService = ghiService;
+    }
+
+    [HttpGet("GetPinnedProjects/{username}")]
+    [EnableCors("_AllowMySite")]
+    public IActionResult GetPinnedProject(string username)
+    {
+        var un = username.ToLower();
+        if (un.Contains("www.github"))
         {
-            string url = "https://www.github.com/" + username;
-
-            GitHubInfo info = new GitHubInfo();
-
-            string type = "";
-
-            List<Project> data = new List<Project>();
-
-            try
-            {
-                type = "pinned";
-                data = GetListOfPinnedProjects(url);
-            }
-            catch (Exception ex)
-            {
-                type = "popular";
-                data = GetListOfPopularProjects(url);
-            }
-            finally
-            {
-                info.type = type;
-                info.projects = data;
-            }
-
-            return info;
+            un = un.Split('/').Last();
         }
-        #region web scraping area
-        [ApiExplorerSettings(IgnoreApi = true)]
-        public List<Project> GetListOfPopularProjects(string url)
+
+        string url = $"https://www.github.com/{un}/";
+
+        var info = _ghiService.GetGitHubInfo(url);
+
+        switch (Enum.Parse(typeof(GHIType), info.type))
         {
-            HtmlWeb web = new HtmlWeb();
-
-            HtmlDocument doc = web.Load(url);
-
-            var listHeader = doc.DocumentNode.SelectSingleNode("//ol[@class='d-flex flex-wrap list-style-none gutter-condensed mb-4']");
-
-            List<HtmlNode> nodes = new List<HtmlNode>();
-
-            foreach (var node in listHeader.ChildNodes)
-            {
-                if (node.OriginalName == "li")
-                    nodes.Add(node);
-            }
-
-            for (int i = 1; i < nodes.Count + 1; i++)
-            {
-                doc.DocumentNode.SelectSingleNode("/html/body/div[4]/main/div[2]/div/div[2]/div[2]/div/div[1]/div/ol/li[" + i + "]/div/div/div/span[2]").Remove();
-            }
-
-            List<Project> projects = new List<Project>();
-
-            foreach (var node in nodes)
-            {
-                Project project = new Project();
-
-                var boxNode = NodeChecker(node, "//div[@class='Box pinned-item-list-item d-flex p-3 width-full public source']");
-                var projectDetailsNode = NodeChecker(boxNode, "//div[@class='pinned-item-list-item-content']");
-                var nameNode = NodeChecker(projectDetailsNode, "//div[@class='d-flex width-full flex-items-center position-relative']");
-                var descNode = NodeChecker(projectDetailsNode, "//p[@class='pinned-item-desc color-fg-muted text-small d-block mt-2 mb-3']");
-
-                project.name = nameNode.InnerText.TrimStart().TrimEnd();
-                project.description = descNode.InnerText.TrimStart().TrimEnd();
-                project.link = url.EndsWith("/") ? url + project.name : url + "/" + project.name;
-
-                projects.Add(project);
-            }
-
-            return projects;
+            case GHIType.Popular:
+                return Ok(info);
+            case GHIType.Pinned:
+                return Ok(info);
+            case GHIType.PageNotFound:
+                return NotFound($"{url} does not lead to a valid GitHub profile.");
+            case GHIType.NoProjectsFound:
+                return NotFound($"No Projects could be found at: {url}.");
+            default:
+                return BadRequest($"Something went wrong trying to get projects from: {url}. There were {info.projects.Count} projects found.");
         }
-        [ApiExplorerSettings(IgnoreApi = true)]
-        public List<Project> GetListOfPinnedProjects(string url)
-        {
-            HtmlWeb web = new HtmlWeb();
-
-            HtmlDocument doc = web.Load(url);
-
-            var listHeader = doc.DocumentNode.SelectSingleNode("//ol[@class='d-flex flex-wrap list-style-none gutter-condensed mb-2 js-pinned-items-reorder-list']");
-
-            List<HtmlNode> nodes = new List<HtmlNode>();
-
-            foreach (var node in listHeader.ChildNodes)
-            {
-                if(node.OriginalName == "li")
-                    nodes.Add(node);
-            }
-
-            for (int i = 1; i < nodes.Count + 1; i++)
-            {
-                doc.DocumentNode.SelectSingleNode("/html/body/div[4]/main/div[2]/div/div[2]/div[2]/div/div[1]/div/ol/li[" + i + "]/div/div/div/div/span[2]").Remove();
-            }
-
-            List<Project> projects = new List<Project>();
-
-            foreach (var node in nodes)
-            {
-                Project project = new Project();
-
-                var boxNode = NodeChecker(node, "//div[@class='Box d-flex pinned-item-list-item p-3 width-full js-pinned-item-list-item public sortable-button-item source']");
-                var projectDetailsNode = NodeChecker(boxNode, "//div[@class='pinned-item-list-item-content']");
-                var nameNode = NodeChecker(projectDetailsNode, "//div[@class='d-flex width-full position-relative']");
-                var descNode = NodeChecker(projectDetailsNode, "//p[@class='pinned-item-desc color-fg-muted text-small d-block mt-2 mb-3']");
-
-                project.name = nameNode.InnerText.TrimStart().TrimEnd();
-                project.description = descNode.InnerText.TrimStart().TrimEnd();
-                project.link = url.EndsWith("/") ? url + project.name : url + "/" + project.name;
-
-                projects.Add(project);
-            }
-
-            return projects;
-        }
-        [ApiExplorerSettings(IgnoreApi = true)]
-        public HtmlNode NodeChecker(HtmlNode parent, string xpath)
-        {
-            var nodechecker = parent.SelectNodes(xpath);
-            var matchedNode = nodechecker.Where(x => x.ParentNode == parent).FirstOrDefault();
-
-            return matchedNode;
-        }
-        #endregion
     }
 }
